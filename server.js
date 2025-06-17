@@ -28,7 +28,7 @@ app.post('/api/cotizar', async (req, res) => {
     });
 
     console.log('🟢 Página cargada. Esperando selects...');
-    await page.waitForTimeout(3000); // dar tiempo extra al render
+    await new Promise(resolve => setTimeout(resolve, 3000)); // dar tiempo extra al render
     await page.waitForSelector('#form\\:provinciaOrigen', { timeout: 10000 });
 
     console.log('🟢 Seleccionando origen...');
