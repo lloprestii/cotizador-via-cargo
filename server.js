@@ -13,7 +13,11 @@ app.post('/api/cotizar', async (req, res) => {
     return res.status(400).json({ error: 'Faltan datos: destino o peso' });
   }
 
-  const browser = await puppeteer.launch({ headless: 'new' });
+  const browser = await puppeteer.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
   const page = await browser.newPage();
 
   try {
