@@ -15,60 +15,63 @@ app.post('/api/cotizar', async (req, res) => {
 
   let browser;
   try {
-    console.log('Lanzando navegador...');
+    console.log('🟢 Lanzando Puppeteer...');
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
-    console.log('Navegador lanzado, cargando página...');
-    await page.goto('https://gtsviacargo.alertran.net/gts/pub/cotizacion.seam', { waitUntil: 'domcontentloaded' });
+    await page.goto('https://gtsviacargo.alertran.net/gts/pub/cotizacion.seam', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
 
-    console.log('Seleccionando origen...');
+    console.log('🟢 Página cargada. Esperando selects...');
+    await page.waitForTimeout(3000); // dar tiempo extra al render
+    await page.waitForSelector('#form\\:provinciaOrigen', { timeout: 10000 });
+
+    console.log('🟢 Seleccionando origen...');
     await page.select('#form\\:provinciaOrigen', '2'); // CABA
-    await page.waitForSelector('#form\\:localidadOrigen');
+    await page.waitForSelector('#form\\:localidadOrigen', { timeout: 10000 });
     await page.select('#form\\:localidadOrigen', '1000'); // Capital Federal
 
-    console.log('Seleccionando destino...');
+    console.log('🟢 Seleccionando destino...');
     await page.select('#form\\:provinciaDestino', '2');
-    await page.waitForSelector('#form\\:localidadDestino');
-    await page.select('#form\\:localidadDestino', destino);
+    await page.waitForSelector('#form\\:localidadDestino', { timeout: 10000 });
+    await page.select('#form\\:localidadDestino', destino.toString());
 
-    console.log(`Cargando peso: ${peso}g`);
+    console.log('🟢 Ingresando peso...');
     await page.type('#form\\:peso', peso.toString());
 
-    console.log('Clickeando en cotizar...');
+    console.log('🟢 Enviando formulario...');
     await Promise.all([
       page.click('#form\\:botonCotizar'),
       page.waitForSelector('#form\\:datosCotizacion', { timeout: 10000 })
     ]);
 
-    console.log('Extrayendo resultado...');
+    console.log('🟢 Extrayendo resultado...');
     const resultado = await page.evaluate(() => {
-      const tabla = document.querySelector('#form\\:datosCotizacion');
-      if (!tabla) return null;
-
-      const celda = tabla.querySelector('td.valor');
+      const celda = document.querySelector('#form\\:datosCotizacion td.valor');
       return celda ? celda.innerText : null;
     });
 
     await browser.close();
 
     if (!resultado) {
-      console.error('No se encontró resultado');
+      console.error('❌ No se encontró el resultado de cotización.');
       return res.status(500).json({ error: 'No se pudo obtener el valor de cotización' });
     }
 
-    console.log(`Resultado obtenido: ${resultado}`);
+    console.log(`✅ Precio devuelto: ${resultado}`);
     res.json({ precio: resultado });
 
   } catch (error) {
     if (browser) await browser.close();
-    console.error('ERROR DETECTADO:', error.message);
+    console.error('🔥 ERROR:', error.message);
     res.status(500).json({ error: 'Error durante la cotización', detalle: error.message });
   }
 });
 
 const PORT = process.env.PORT;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
