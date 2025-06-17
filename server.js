@@ -13,36 +13,38 @@ app.post('/api/cotizar', async (req, res) => {
     return res.status(400).json({ error: 'Faltan datos: destino o peso' });
   }
 
-  const browser = await puppeteer.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-
+  let browser;
   try {
+    console.log('Lanzando navegador...');
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
+    console.log('Navegador lanzado, cargando página...');
     await page.goto('https://gtsviacargo.alertran.net/gts/pub/cotizacion.seam', { waitUntil: 'domcontentloaded' });
 
-    // Origen fijo
+    console.log('Seleccionando origen...');
     await page.select('#form\\:provinciaOrigen', '2'); // CABA
     await page.waitForSelector('#form\\:localidadOrigen');
     await page.select('#form\\:localidadOrigen', '1000'); // Capital Federal
 
-    // Destino
-    await page.select('#form\\:provinciaDestino', '2'); // También CABA por defecto, se puede ajustar
+    console.log('Seleccionando destino...');
+    await page.select('#form\\:provinciaDestino', '2');
     await page.waitForSelector('#form\\:localidadDestino');
-    await page.select('#form\\:localidadDestino', destino); // ID del destino (se debe mapear)
+    await page.select('#form\\:localidadDestino', destino);
 
-    // Peso
+    console.log(`Cargando peso: ${peso}g`);
     await page.type('#form\\:peso', peso.toString());
 
-    // Enviar
+    console.log('Clickeando en cotizar...');
     await Promise.all([
       page.click('#form\\:botonCotizar'),
-      page.waitForSelector('#form\\:datosCotizacion')
+      page.waitForSelector('#form\\:datosCotizacion', { timeout: 10000 })
     ]);
 
-    // Extraer resultado
+    console.log('Extrayendo resultado...');
     const resultado = await page.evaluate(() => {
       const tabla = document.querySelector('#form\\:datosCotizacion');
       if (!tabla) return null;
@@ -54,13 +56,16 @@ app.post('/api/cotizar', async (req, res) => {
     await browser.close();
 
     if (!resultado) {
+      console.error('No se encontró resultado');
       return res.status(500).json({ error: 'No se pudo obtener el valor de cotización' });
     }
 
+    console.log(`Resultado obtenido: ${resultado}`);
     res.json({ precio: resultado });
 
   } catch (error) {
-    await browser.close();
+    if (browser) await browser.close();
+    console.error('ERROR DETECTADO:', error.message);
     res.status(500).json({ error: 'Error durante la cotización', detalle: error.message });
   }
 });
